@@ -42,13 +42,12 @@ func parseBlobURL(blobURL string) (containerName, blobName string, err error) {
 	return containerName, blobName, nil
 }
 
-func main() {
-	videoURL := os.Args[1]
+func convertToAudio(videoURL string) error {
 	fmt.Println("Processing video from URL:", videoURL)
 
 	containerName, blobName, err := parseBlobURL(videoURL)
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("error parsing blob URL: %w", err)
 	}
 	client, _ := azblob.NewClientFromConnectionString(env.GetInstance().BlobConnectString, nil)
 
@@ -59,30 +58,30 @@ func main() {
 
 	resp, err := blobClient.DownloadStream(context.Background(), nil)
 	if err != nil {
-		log.Panicf("failed to download blob: %v", err)
+		return fmt.Errorf("failed to download blob: %w", err)
 	}
 	defer resp.Body.Close()
 
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {
-		log.Panicf("failed to read blob data: %v", err)
+		return fmt.Errorf("failed to read blob data: %w", err)
 	}
 
 	srcFile, err := os.CreateTemp("", "temp-")
 	if err != nil {
-		log.Panicf("Error while creating temp file: %v", err)
+		return fmt.Errorf("error while creating temp file: %w", err)
 	}
 	defer srcFile.Close()
 	defer os.Remove(srcFile.Name())
 
 	_, err = srcFile.Write(data)
 	if err != nil {
-		log.Panicf("Error while writing to temp file: %v", err)
+		return fmt.Errorf("error while writing to temp file: %w", err)
 	}
 
 	targetFile, err := os.CreateTemp("", "processed-*.mp4")
 	if err != nil {
-		log.Panicf("Error while creating temp file: %v", err)
+		return fmt.Errorf("error while creating temp file: %w", err)
 	}
 	defer targetFile.Close()
 	defer os.Remove(targetFile.Name())
@@ -90,14 +89,28 @@ func main() {
 	// Convert video to audio using ffmpeg
 	cmd := exec.Command(env.GetInstance().FFMPEGPath, "-i", srcFile.Name(), "-y", "-acodec", "libopus", "-b:a", strconv.Itoa(env.GetInstance().DefaultAudioBitRate)+"k", targetFile.Name())
 	if err := cmd.Run(); err != nil {
-		log.Panicf("Error while converting video to audio: %v", err)
+		return fmt.Errorf("error while converting video to audio: %w", err)
 	}
 
 	_, err = client.UploadBuffer(context.TODO(), env.GetInstance().AudioContainerName, targetFile.Name(), data, nil)
 	if err != nil {
-		log.Panicf("Error while uploading audio to blob: %v", err)
+		return fmt.Errorf("error while uploading audio to blob: %w", err)
 	}
 
 	blobURL := fmt.Sprintf("%s%s/%s", client.URL(), env.GetInstance().AudioContainerName, blobName)
 	log.Printf("Audio uploaded to: %s", blobURL)
+	return nil
+}
+
+func main() {
+	videoURL := os.Args[1]
+	retry := -1
+	for retry < env.GetInstance().TranscodingMaxRetry {
+		err := convertToAudio(videoURL)
+		if err == nil {
+			break
+		}
+		log.Printf("Error while converting video to audio in the %dth attempt: %v", retry+1, err)
+		retry++
+	}
 }
