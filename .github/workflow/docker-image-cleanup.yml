@@ -1,0 +1,39 @@
+name: Docker Image Cleanup
+
+on:
+    schedule:
+        # 每月的第一天午夜运行
+        - cron: '0 0 1 * *'
+
+jobs:
+    cleanup:
+        runs-on: ubuntu-latest
+        environment: production
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v2
+
+            - name: Set up Docker Environment
+              uses: docker/setup-buildx-action@v1
+
+            - name: Log in to Docker Hub
+              uses: docker/login-action@v1
+              with:
+                  username: ${{ secrets.DOCKER_USERNAME }}
+                  password: ${{ secrets.DOCKER_PASSWORD }}
+
+            - name: Fetch all image tags from Docker Hub
+              id: fetch-tags
+              run: |
+                  TAGS=$(docker buildx imagetools inspect haozhealexzhang/cognitube-audio-conversion-job --raw | jq -r '.manifests[] | select(.annotations."org.opencontainers.image.created" < "'$(date --date="1 month ago" --iso-8601=seconds)'") | .annotations."org.opencontainers.image.title"')
+                  echo "::set-output name=old_tags::${TAGS}"
+
+            - name: Remove old images
+              run: |
+                  for TAG in ${{ steps.fetch-tags.outputs.old_tags }}
+                  do
+                    if [[ "$TAG" != "latest" ]]; then
+                      docker rmi haozhealexzhang/cognitube-audio-conversion-job:$TAG
+                      docker push haozhealexzhang/cognitube-audio-conversion-job:$TAG
+                    fi
+                  done
