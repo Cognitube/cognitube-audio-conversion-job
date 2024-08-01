@@ -33,6 +33,9 @@ COPY --from=builder /app/myapp .
 ENV AZURE_BLOB_CONNECTION_STRING="DefaultEndpointsProtocol=https;AccountName=cognitube;AccountKey=a1XDmr4IlO9I/tcsuh1akTaGFgmp+nQEoQdA8SlFpmmn7Zi0HKeDMk3ntxWjGI/HMFpQjzBys2ZX+AStqYVfsg==;EndpointSuffix=core.windows.net"
 ENV FFMPEG_PATH="/usr/bin/ffmpeg"
 ENV AUDIO_CONTAINER_NAME="audio-container"
+ENV KAFKA_EVENTHUB_CONNECTION_STRING="Endpoint=sb://cognitube-kafka.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=l9+PMVbv8R4LuCtQlPo5x8PIE8jZqn8O4+AEhEMQoqA="
+ENV KAFKA_EVENTHUB_NAMESPACE=cognitube-kafka
+ENV KEYWORD_SERVICE_URL="https://cognitube-keyword-service.thankfulfield-7c1523f0.eastus.azurecontainerapps.io/api"
 
 # 运行应用程序
 CMD ["./myapp"]
