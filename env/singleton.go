@@ -17,14 +17,6 @@ type Variables struct {
 var instance *Variables
 var once sync.Once
 
-func getEnvWithDefault(key, defaultValue string) string {
-	value := os.Getenv(key)
-	if value == "" {
-		return defaultValue
-	}
-	return value
-}
-
 func getEnvWithDefaultInt(key string, defaultValue int) int {
 	value := os.Getenv(key)
 	if value == "" {
